@@ -10,7 +10,7 @@ app = FastAPI()
 
 origins = [
     "http://localhost:3000", # For local development
-    "https://ttsfrontend.vercel.app/"
+    "https://ttsfrontend.vercel.app"
     # Add your deployed frontend URL here after deployment, e.g., "https://your-frontend-domain.vercel.app"
 ]
 
