@@ -30,14 +30,26 @@ class TTSRequest(BaseModel):
 AUDIO_DIR = "audio"
 os.makedirs(AUDIO_DIR, exist_ok=True)
 
-# Initialize TTS models (this will download models if not present)
-# You might want to load these lazily or in a more robust way for production
-tts_models = {
-    "Tacotron2": TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC", progress_bar=False, gpu=False),
-    "FastSpeech": TTS(model_name="tts_models/en/ljspeech/fastspeech", progress_bar=False, gpu=False),
-    "VITS": TTS(model_name="tts_models/en/ljspeech/vits", progress_bar=False, gpu=False),
-    "TransformerTTS": TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC_ph", progress_bar=False, gpu=False), # Using a similar model as TransformerTTS is not directly available as a simple model name
+# Dictionary to hold model paths
+# We are not loading them into memory on startup anymore.
+model_paths = {
+    "Tacotron2": "tts_models/en/ljspeech/tacotron2-DDC",
+    "FastSpeech": "tts_models/en/ljspeech/fastspeech",
+    "VITS": "tts_models/en/ljspeech/vits",
+    "TransformerTTS": "tts_models/en/ljspeech/tacotron2-DDC_ph",
 }
+
+# Cache for loaded models to avoid reloading them on every request
+loaded_models = {}
+
+def get_tts_model(model_name: str):
+    """Loads a TTS model into memory or returns the cached model."""
+    if model_name not in loaded_models:
+        print(f"Loading model: {model_name}...")
+        # Load the model and cache it
+        loaded_models[model_name] = TTS(model_name=model_paths[model_name], progress_bar=False, gpu=False)
+        print(f"Model {model_name} loaded.")
+    return loaded_models[model_name]
 
 @app.post("/api/tts")
 async def text_to_speech(request: TTSRequest):
@@ -46,16 +58,24 @@ async def text_to_speech(request: TTSRequest):
 
     if not text:
         raise HTTPException(status_code=400, detail="Text cannot be empty.")
-    if model_name not in tts_models:
-        raise HTTPException(status_code=400, detail=f"Invalid model name: {model_name}. Available models: {', '.join(tts_models.keys())}")
+    if model_name not in model_paths:
+        raise HTTPException(status_code=400, detail=f"Invalid model name: {model_name}. Available models: {', '.join(model_paths.keys())}")
 
     try:
-        tts = tts_models[model_name]
+        # Get the model (loads it if it's not already in memory)
+        tts = get_tts_model(model_name)
+        
         audio_filename = f"{uuid.uuid4()}.wav"
         audio_filepath = os.path.join(AUDIO_DIR, audio_filename)
+        
+        print(f"Generating audio for '{text[:30]}...' with {model_name}")
         tts.tts_to_file(text=text, file_path=audio_filepath)
+        print(f"Audio file saved to {audio_filepath}")
+        
         return {"audio_url": f"/{AUDIO_DIR}/{audio_filename}"}
     except Exception as e:
+        # Log the full error for debugging
+        print(f"An error occurred: {e}")
         raise HTTPException(status_code=500, detail=f"TTS conversion failed: {str(e)}")
 
 # To run this: uvicorn main:app --reload --port 8000
