@@ -1,5 +1,6 @@
 print("--- Application starting up ---")
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from TTS.api import TTS
 import os
@@ -11,6 +12,7 @@ app = FastAPI()
 
 origins = [
     "http://localhost:3000", # For local development
+    "https://ttsfrontend.vercel.app"
     # Add your deployed frontend URL here after deployment, e.g., "https://your-frontend-domain.vercel.app"
 ]
 
@@ -21,6 +23,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files to serve audio files
+app.mount("/audio", StaticFiles(directory="audio"), name="audio")
 
 # Define a Pydantic model for the request body
 class TTSRequest(BaseModel):
@@ -73,7 +78,7 @@ async def text_to_speech(request: TTSRequest):
         tts.tts_to_file(text=text, file_path=audio_filepath)
         print(f"Audio file saved to {audio_filepath}")
         
-        return {"audio_url": f"/{AUDIO_DIR}/{audio_filename}"}
+        return {"audio_url": f"/audio/{audio_filename}"}
     except Exception as e:
         # Log the full error for debugging
         print(f"An error occurred: {e}")
