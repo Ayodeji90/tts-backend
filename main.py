@@ -1,3 +1,4 @@
+print("--- Application starting up ---")
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from TTS.api import TTS
