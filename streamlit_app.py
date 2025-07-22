@@ -45,26 +45,44 @@ if st.button("Generate Audio"):
     else:
         with st.spinner(f"Generating audio with {model_name}... This may take a moment."):
             try:
-                # --- Model Loading (with caching) ---
-                @st.cache_resource
-                def get_tts_model(model_name):
-                    model_paths = {
-                        "Tacotron2": "tts_models/en/ljspeech/tacotron2-DDC",
-                        "FastSpeech": "tts_models/en/ljspeech/fastspeech",
-                        "VITS": "tts_models/en/ljspeech/vits",
-                        "TransformerTTS": "tts_models/en/ljspeech/tacotron2-DDC_ph",
-                    }
-                    return TTS(model_name=model_paths[model_name], progress_bar=False, gpu=False)
+                if model_name in ["FastSpeech", "TransformerTTS"]:
+                    from transformers import pipeline
+                    import soundfile as sf
 
-                tts = get_tts_model(model_name)
+                    @st.cache_resource
+                    def get_huggingface_model():
+                        return pipeline("text-to-speech", model="saheedniyi/YarnGPT")
 
-                # --- Audio File Generation ---
-                AUDIO_DIR = "audio"
-                os.makedirs(AUDIO_DIR, exist_ok=True)
-                audio_filename = f"{uuid.uuid4()}.wav"
-                audio_filepath = os.path.join(AUDIO_DIR, audio_filename)
+                    pipe = get_huggingface_model()
+                    output = pipe(text)
 
-                tts.tts_to_file(text=text, file_path=audio_filepath)
+                    # --- Audio File Generation ---
+                    AUDIO_DIR = "audio"
+                    os.makedirs(AUDIO_DIR, exist_ok=True)
+                    audio_filename = f"{uuid.uuid4()}.wav"
+                    audio_filepath = os.path.join(AUDIO_DIR, audio_filename)
+
+                    sf.write(audio_filepath, output["audio"], samplerate=output["sampling_rate"])
+
+                else:
+                    # --- Model Loading (with caching) ---
+                    @st.cache_resource
+                    def get_tts_model(model_name):
+                        model_paths = {
+                            "Tacotron2": "tts_models/en/ljspeech/tacotron2-DDC",
+                            "VITS": "tts_models/en/ljspeech/vits",
+                        }
+                        return TTS(model_name=model_paths[model_name], progress_bar=False, gpu=False)
+
+                    tts = get_tts_model(model_name)
+
+                    # --- Audio File Generation ---
+                    AUDIO_DIR = "audio"
+                    os.makedirs(AUDIO_DIR, exist_ok=True)
+                    audio_filename = f"{uuid.uuid4()}.wav"
+                    audio_filepath = os.path.join(AUDIO_DIR, audio_filename)
+
+                    tts.tts_to_file(text=text, file_path=audio_filepath)
 
                 # --- Display Audio ---
                 st.success("Audio generated successfully!")
